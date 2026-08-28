@@ -1,0 +1,4 @@
+faster-whisper>=1.0.0
+rapidfuzz>=3.0.0
+zhconv
+flask>=3.0

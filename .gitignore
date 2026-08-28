@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+
+# 虚拟环境（几百MB依赖库，不入库，见 requirements.txt）
+.venv/
+venv/
+
+# 本地使用记录（含个人路径）
+settings.json
+rename_log.json
+
+# 用户素材与备份（不入库）
+测试文件/
+web版/
+web版.zip
+*.mp4
+*.mov
+*.mkv
