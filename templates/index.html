@@ -14,7 +14,7 @@
   .card h2 .step { background: #2563eb; color: #fff; width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; }
   .form-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
   .form-row label { width: 110px; text-align: right; color: #475569; flex-shrink: 0; }
-  .form-row input, .form-row select { flex: 1; padding: 9px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 15px; font-family: inherit; }
+  .form-row input, .form-row select { flex: 1; padding: 9px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 15px; font-family: inherit; min-width: 0; }
   .form-row input:focus, .form-row select:focus { outline: 2px solid #93c5fd; border-color: #2563eb; }
   .btn { padding: 9px 18px; border: none; border-radius: 8px; font-size: 15px; cursor: pointer; font-family: inherit; }
   .btn-primary { background: #2563eb; color: #fff; }
@@ -23,6 +23,12 @@
   .btn-secondary:hover { background: #cbd5e1; }
   .btn-big { padding: 12px 36px; font-size: 17px; }
   .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .btn-add { margin-top: 2px; }
+  .btn-del { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; width: 38px; height: 40px; border-radius: 8px; cursor: pointer; font-size: 15px; flex-shrink: 0; }
+  .btn-del:hover { background: #fee2e2; }
+  .rows-label { font-size: 14px; font-weight: 600; color: #334155; margin: 6px 0 10px; }
+  .sub-row { margin-left: 60px; }
+  .sub-row label { width: 90px; }
   .hint { font-size: 13px; color: #64748b; margin-top: 4px; }
   .prefix-box { display: flex; gap: 10px; align-items: center; flex: 1; }
   .prefix-box input { width: 130px !important; flex: none !important; }
@@ -37,10 +43,10 @@
   th { background: #f8fafc; color: #475569; font-weight: 600; text-align: left; padding: 10px 8px; border-bottom: 2px solid #e2e8f0; white-space: nowrap; }
   td { padding: 8px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
   tr:hover td { background: #f8fafc; }
-  .file-cell { font-family: Consolas, monospace; font-size: 13px; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file-cell { font-family: Consolas, monospace; font-size: 13px; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .play-btn { background: #ecfdf5; border: 1px solid #a7f3d0; color: #059669; width: 34px; height: 30px; border-radius: 6px; cursor: pointer; font-size: 13px; }
   .play-btn:hover { background: #d1fae5; }
-  .recognized { max-width: 340px; color: #475569; font-size: 13px; line-height: 1.5; max-height: 58px; overflow: hidden; }
+  .recognized { max-width: 320px; color: #475569; font-size: 13px; line-height: 1.5; max-height: 58px; overflow: hidden; }
   select.shot-select, input.name-input { width: 100%; padding: 7px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; font-family: inherit; }
   select.shot-select:focus, input.name-input:focus { outline: 2px solid #93c5fd; border-color: #2563eb; }
   input.name-input { font-family: Consolas, monospace; font-size: 13px; }
@@ -56,16 +62,23 @@
   .toolbar { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; gap: 12px; }
   .summary { font-size: 14px; color: #475569; }
   /* 弹窗 */
-  .modal-mask { position: fixed; inset: 0; background: rgba(15,23,42,.45); display: flex; align-items: center; justify-content: center; z-index: 50; }
-  .modal { background: #fff; border-radius: 12px; width: 640px; max-height: 78vh; display: flex; flex-direction: column; }
+  .modal-mask { position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100%; height: 100%; background: rgba(15,23,42,.45); display: flex; align-items: center; justify-content: center; z-index: 50; }
+  .modal { background: #fff; border-radius: 12px; width: 600px; max-width: 94vw; height: 620px; max-height: 86vh; display: flex; flex-direction: column; box-shadow: 0 10px 34px rgba(0,0,0,.22); }
   .modal-head { padding: 14px 18px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
   .modal-head b { font-size: 16px; }
   .modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: #64748b; }
   .modal-nav { display: flex; gap: 8px; padding: 10px 16px; border-bottom: 1px solid #e2e8f0; align-items: center; }
-  .modal-nav input { flex: 1; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-family: Consolas, monospace; font-size: 13px; }
+  .modal-nav input { flex: 1; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-family: Consolas, monospace; font-size: 13px; min-width: 0; }
   .modal-nav input:focus { outline: 2px solid #93c5fd; border-color: #2563eb; }
   .modal-nav .btn { padding: 8px 14px; white-space: nowrap; }
-  .modal-body { overflow-y: auto; flex: 1; padding: 6px 0; }
+  /* 列表区：原生滚动条隐藏（部分浏览器为悬浮式自动隐藏，用户看不见），改用自绘滚动条 */
+  .modal-list { position: relative; flex: 1 1 0; min-height: 0; display: flex; }
+  .modal-body { overflow-y: auto; flex: 1; padding: 6px 0; scrollbar-width: none; -ms-overflow-style: none; }
+  .modal-body::-webkit-scrollbar { display: none; }
+  .vscroll { position: absolute; top: 6px; bottom: 6px; right: 4px; width: 12px; background: #f1f5f9; border-radius: 6px; display: none; z-index: 2; }
+  .vscroll.show { display: block; }
+  .vscroll-thumb { position: absolute; left: 0; top: 0; width: 12px; height: 40px; background: #94a3b8; border-radius: 6px; cursor: grab; }
+  .vscroll-thumb:hover, .vscroll-thumb.dragging { background: #64748b; }
   .modal-body .item { padding: 9px 18px; cursor: pointer; display: flex; gap: 8px; align-items: center; }
   .modal-body .item:hover { background: #eff6ff; }
   .modal-body .item .ico { width: 20px; text-align: center; }
@@ -86,25 +99,20 @@
 
   <!-- 步骤1：选择剧本和视频 -->
   <div class="card" id="card-setup">
-    <h2><span class="step">1</span> 选择剧本和视频文件夹</h2>
-    <div class="form-row">
-      <label>剧本文件</label>
-      <input id="inp-script" placeholder="可直接粘贴路径，或点“浏览”选择剧本文件（.md / .txt）">
-      <button class="btn btn-secondary" onclick="openBrowser('file')">浏览</button>
+    <h2><span class="step">1</span> 选择剧本和视频文件夹（均可添加多个）</h2>
+
+    <div class="rows-label">剧本文件</div>
+    <div id="script-rows"></div>
+    <button class="btn btn-secondary btn-add" onclick="addScriptRow()">＋ 新增一部剧本</button>
+
+    <div class="rows-label" style="margin-top:16px">视频文件夹</div>
+    <div id="folder-rows"></div>
+    <button class="btn btn-secondary btn-add" onclick="addFolderRow()">＋ 新增一个文件夹</button>
+
+    <div class="hint" style="margin-top:14px">
+      镜头标识 = 剧本中每个镜头标题的开头字（如 P、剧情、小节），选好剧本后自动检测；<b>同一剧本里混用多种格式（如第11集用 P01、第12集用 剧情12-1）时会自动全部填入</b>，也可手动用逗号分隔填写多个，支持「剧情29-1」这类复合序号。<br>
+      确认改名后，视频会移入「视频所在文件夹 \ 剧本名（不带后缀）」子文件夹中分开存放。
     </div>
-    <div class="form-row">
-      <label>视频文件夹</label>
-      <input id="inp-videos" placeholder="可直接粘贴路径，或点“浏览”选择存放视频的文件夹">
-      <button class="btn btn-secondary" onclick="openBrowser('dir')">浏览</button>
-    </div>
-    <div class="form-row">
-      <label>镜头标识</label>
-      <div class="prefix-box">
-        <input id="inp-prefix" placeholder="如：P">
-        <span class="prefix-sug" id="prefix-sug"></span>
-      </div>
-    </div>
-    <div class="hint" style="margin-left:120px">镜头标识 = 剧本中每个镜头标题的开头字。例如剧本用「P01、P02…」就填 P；用「剧情1、剧情2…」就填 剧情。选好剧本后会自动检测。</div>
     <div style="margin-top:16px; margin-left:120px">
       <button class="btn btn-primary btn-big" id="btn-start" onclick="startAnalyze()">开始识别</button>
     </div>
@@ -135,9 +143,9 @@
             <th style="width:46px">播放</th>
             <th>原文件名</th>
             <th>识别到的台词</th>
-            <th style="width:250px">对应镜头（可修改）</th>
+            <th style="width:270px">对应镜头（按剧本分组，可修改）</th>
             <th style="width:96px">匹配度</th>
-            <th style="width:300px">新文件名（可修改）</th>
+            <th style="width:290px">新文件名（可修改）</th>
           </tr>
         </thead>
         <tbody id="tbody-results"></tbody>
@@ -178,7 +186,10 @@
       <input id="browser-input" placeholder="粘贴路径到此处，按回车或点“跳转”直接定位" spellcheck="false">
       <button class="btn btn-primary" onclick="browserJump()">跳转</button>
     </div>
-    <div class="modal-body" id="browser-body"></div>
+    <div class="modal-list">
+      <div class="modal-body" id="browser-body"></div>
+      <div class="vscroll" id="browser-vscroll"><div class="vscroll-thumb" id="browser-thumb"></div></div>
+    </div>
     <div class="modal-foot">
       <button class="btn btn-secondary" onclick="closeBrowser()">取消</button>
       <button class="btn btn-primary" id="browser-ok" onclick="chooseBrowser()">选择此项</button>
@@ -187,71 +198,164 @@
 </div>
 
 <script>
-let sections = [];      // 镜头列表
-let results = [];       // 识别结果
+let scripts = [];    // [{name, stem}] 当前识别使用的剧本
+let sections = [];   // 镜头列表（全局索引，含 script_idx）
+let results = [];
 let pollTimer = null;
+let cachedSettings = {};  // 供弹窗定位上次路径
 
-/* ---------- 设置记忆 ---------- */
+/* ---------- 动态行管理 ---------- */
+function addScriptRow(path = '', prefix = '', sug = '') {
+  const box = document.getElementById('script-rows');
+  const div = document.createElement('div');
+  div.className = 'script-row';
+  const i = box.children.length + 1;
+  div.innerHTML = `
+    <div class="form-row">
+      <label>剧本 ${i}</label>
+      <input class="inp-script" value="${escAttr(path)}" placeholder="可直接粘贴路径，或点“浏览”选择剧本文件（.md / .txt）">
+      <button class="btn btn-secondary" onclick="openBrowser('file', this)">浏览</button>
+      <button class="btn-del" title="删除这部剧本" onclick="delRow(this)">✕</button>
+    </div>
+    <div class="form-row sub-row">
+      <label>镜头标识</label>
+      <div class="prefix-box">
+        <input class="inp-prefix" value="${escAttr(prefix)}" placeholder="如：P 或 剧情，多种格式用逗号分隔（P,剧情）">
+        <span class="prefix-sug">${esc(sug)}</span>
+      </div>
+    </div>`;
+  div.querySelector('.inp-script').addEventListener('change', function () {
+    if (this.value.trim()) detectPrefixForRow(div);
+  });
+  box.appendChild(div);
+  renumberRows('script-rows', '剧本 ');
+}
+
+function addFolderRow(path = '') {
+  const box = document.getElementById('folder-rows');
+  const div = document.createElement('div');
+  div.className = 'folder-row';
+  const i = box.children.length + 1;
+  div.innerHTML = `
+    <div class="form-row">
+      <label>文件夹 ${i}</label>
+      <input class="inp-videos" value="${escAttr(path)}" placeholder="可直接粘贴路径，或点“浏览”选择存放视频的文件夹">
+      <button class="btn btn-secondary" onclick="openBrowser('dir', this)">浏览</button>
+      <button class="btn-del" title="删除这个文件夹" onclick="delRow(this)">✕</button>
+    </div>`;
+  box.appendChild(div);
+  renumberRows('folder-rows', '文件夹 ');
+}
+
+function delRow(btn) {
+  const row = btn.closest('.script-row, .folder-row');
+  const box = row.parentElement;
+  // 始终保留至少一行
+  if (box.children.length <= 1) {
+    row.querySelectorAll('input').forEach(i => i.value = '');
+    row.querySelector('.prefix-sug') && (row.querySelector('.prefix-sug').textContent = '');
+    return;
+  }
+  row.remove();
+  renumberRows('script-rows', '剧本 ');
+  renumberRows('folder-rows', '文件夹 ');
+  saveSettings();
+}
+
+function renumberRows(boxId, labelPrefix) {
+  const box = document.getElementById(boxId);
+  [...box.children].forEach((row, i) => {
+    const label = row.querySelector('.form-row > label');
+    if (label) label.textContent = labelPrefix + (i + 1);
+  });
+}
+
+function escAttr(s) { return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+function esc(s) { const d = document.createElement('span'); d.textContent = s == null ? '' : s; return d.innerHTML; }
+
+/* ---------- 设置记忆（多剧本/多文件夹） ---------- */
 async function loadSettings() {
   try {
     const r = await fetch('/api/settings');
     const d = await r.json();
     const s = d.settings || {};
-    if (s.script) document.getElementById('inp-script').value = s.script;
-    if (s.videos) document.getElementById('inp-videos').value = s.videos;
-    if (s.prefix) {
-      document.getElementById('inp-prefix').value = s.prefix;
-      if (s.script) document.getElementById('prefix-sug').textContent = `上次使用：${s.prefix}（自动恢复，如有变化请修改）`;
-    }
-  } catch (e) { /* 忽略 */ }
+    cachedSettings = s;
+    // 剧本列表（兼容旧版单剧本记录）
+    let scriptList = Array.isArray(s.scripts) ? s.scripts.filter(x => x && x.path) : [];
+    if (!scriptList.length && s.script) scriptList = [{ path: s.script, prefix: s.prefix || '' }];
+    if (!scriptList.length) scriptList = [{ path: '', prefix: '' }];
+    scriptList.forEach(x => addScriptRow(x.path, x.prefix || '',
+      x.prefix ? `上次使用：${x.prefix}（自动恢复）` : ''));
+    // 文件夹列表（兼容旧版单文件夹记录）
+    let videoList = Array.isArray(s.videos) ? s.videos.filter(Boolean) : [];
+    if (!videoList.length && s.videos) videoList = [s.videos];
+    if (!videoList.length) videoList = [''];
+    videoList.forEach(v => addFolderRow(v));
+  } catch (e) {
+    addScriptRow();
+    addFolderRow();
+  }
 }
 
 async function saveSettings() {
-  const settings = {
-    script: document.getElementById('inp-script').value,
-    videos: document.getElementById('inp-videos').value,
-    prefix: document.getElementById('inp-prefix').value.trim(),
-  };
-  try { await fetch('/api/settings', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({settings}) }); } catch (e) { /* 忽略 */ }
+  const scriptList = [...document.querySelectorAll('.script-row')].map(row => ({
+    path: row.querySelector('.inp-script').value.trim(),
+    prefix: row.querySelector('.inp-prefix').value.trim()
+  }));
+  const videoList = [...document.querySelectorAll('.inp-videos')].map(i => i.value.trim());
+  try {
+    await fetch('/api/settings', { method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({settings: {scripts: scriptList, videos: videoList}}) });
+    cachedSettings = { ...cachedSettings, scripts: scriptList, videos: videoList };
+  } catch (e) { /* 忽略 */ }
 }
 
 /* ---------- 路径浏览弹窗 ---------- */
 let browserMode = 'dir';
 let browserCurrent = '';
-let browserParent = '';  // 上级目录（'' 表示已到"此电脑"盘符列表）
+let browserParent = '';   // 上级目录（'' 表示已到"此电脑"盘符列表）
 let browserChoice = '';   // 当前选中项（dir 模式=路径，file 模式=文件名）
+let browserTarget = null; // 目标输入框（多行场景下定位到具体某一行）
 
-async function openBrowser(mode) {
+async function openBrowser(mode, btn) {
   browserMode = mode;
   browserChoice = '';
+  browserTarget = btn.closest('.form-row').querySelector('input');
   document.getElementById('browser-modal').hidden = false;
   document.getElementById('browser-title').textContent = mode === 'file' ? '选择剧本文件' : '选择视频文件夹';
   document.getElementById('browser-ok').textContent = mode === 'file' ? '选择此文件' : '选择此文件夹';
-  // 默认定位到上次选择的路径；无记录或路径已失效则显示盘符列表
-  let last = '';
-  try {
-    const r = await fetch('/api/settings');
-    const s = (await r.json()).settings || {};
-    last = (mode === 'file' ? s.script : s.videos) || '';
-  } catch (e) { /* 忽略 */ }
-  loadBrowse(last, true);  // silent=true：恢复记忆路径失败时静默回退盘符列表
+  // 默认定位：该行已填路径 > 上次选择 > 盘符列表
+  let last = browserTarget.value.trim();
+  if (!last) {
+    const s = cachedSettings;
+    if (mode === 'file') {
+      const arr = Array.isArray(s.scripts) ? s.scripts : [];
+      last = (arr.length && arr[arr.length - 1].path) || s.script || '';
+    } else {
+      const arr = Array.isArray(s.videos) ? s.videos : [];
+      last = (arr.length && arr[arr.length - 1]) || s.videos || '';
+    }
+  }
+  loadBrowse(last, true);  // silent=true：记忆路径失效时静默回退盘符列表
 }
 function closeBrowser() { document.getElementById('browser-modal').hidden = true; }
 
+let browseSeq = 0;  // 请求序号：只渲染最新一次请求的结果，防止慢响应晚到覆盖新内容
 async function loadBrowse(path, silent = false) {
+  const seq = ++browseSeq;
   const r = await fetch(`/api/browse?path=${encodeURIComponent(path)}&mode=${browserMode}`);
   const d = await r.json();
+  if (seq !== browseSeq) return;  // 已有更新的请求，丢弃本次过期响应
   if (d.ok === false) {
     if (silent) { loadBrowse(''); }  // 记忆路径失效：静默回到盘符列表
     else {
       alert(d.msg || '路径无效');
-      // 恢复输入框为当前目录，继续浏览
       document.getElementById('browser-input').value = browserCurrent === '此电脑' ? '' : browserCurrent;
     }
     return;
   }
   browserCurrent = d.current;
-  browserParent = d.parent;  // 盘符根目录时 parent 为空 -> 返回时显示盘符列表
+  browserParent = d.parent;
   document.getElementById('browser-input').value = browserCurrent === '此电脑' ? '' : browserCurrent;
   document.getElementById('btn-up').disabled = !browserCurrent || browserCurrent === '此电脑';
   const body = document.getElementById('browser-body');
@@ -280,15 +384,66 @@ async function loadBrowse(path, silent = false) {
       div.ondblclick = () => chooseBrowser();
       body.appendChild(div);
     });
-    // 粘贴文件路径跳转：自动定位并高亮该文件
     if (d.target_file && d.files.includes(d.target_file)) {
       const idx = [...body.children].findIndex(c => c.textContent.endsWith(d.target_file));
       if (idx >= 0) highlight(body.children[idx], browserCurrent + '\\' + d.target_file);
     }
   }
+  updateVScroll();
 }
 
-/* 地址栏粘贴路径跳转：回车或点"跳转" */
+/* ---------- 自绘滚动条（任何浏览器都可见、可拖动） ---------- */
+function updateVScroll() {
+  const body = document.getElementById('browser-body');
+  const bar = document.getElementById('browser-vscroll');
+  const thumb = document.getElementById('browser-thumb');
+  const maxScroll = body.scrollHeight - body.clientHeight;
+  if (maxScroll <= 4) { bar.classList.remove('show'); return; }
+  bar.classList.add('show');
+  const trackH = bar.clientHeight;
+  const thumbH = Math.max(28, Math.round(body.clientHeight / body.scrollHeight * trackH));
+  const maxTop = Math.max(1, trackH - thumbH);
+  thumb.style.height = thumbH + 'px';
+  thumb.style.top = Math.round(body.scrollTop / maxScroll * maxTop) + 'px';
+}
+
+(function initVScroll() {
+  const body = document.getElementById('browser-body');
+  const bar = document.getElementById('browser-vscroll');
+  const thumb = document.getElementById('browser-thumb');
+  body.addEventListener('scroll', updateVScroll);
+  window.addEventListener('resize', updateVScroll);
+  // 拖动 thumb -> 滚动列表
+  let drag = null;
+  thumb.addEventListener('mousedown', e => {
+    e.preventDefault();
+    drag = { startY: e.clientY, startTop: thumb.offsetTop };
+    thumb.classList.add('dragging');
+  });
+  document.addEventListener('mousemove', e => {
+    if (!drag) return;
+    const trackH = bar.clientHeight;
+    const thumbH = thumb.offsetHeight;
+    const maxScroll = body.scrollHeight - body.clientHeight;
+    const maxTop = Math.max(1, trackH - thumbH);
+    let top = drag.startTop + (e.clientY - drag.startY);
+    top = Math.max(0, Math.min(maxTop, top));
+    body.scrollTop = maxScroll * top / maxTop;
+    updateVScroll();
+  });
+  document.addEventListener('mouseup', () => {
+    if (drag) { drag = null; thumb.classList.remove('dragging'); }
+  });
+  // 点击轨道空白处：向上/向下翻页
+  bar.addEventListener('mousedown', e => {
+    if (e.target === thumb) return;
+    const y = e.clientY - bar.getBoundingClientRect().top;
+    const page = body.clientHeight * 0.9;
+    body.scrollTop += y < thumb.offsetTop ? -page : page;
+    updateVScroll();
+  });
+})();
+
 function browserJump() {
   const p = document.getElementById('browser-input').value.trim();
   if (p) loadBrowse(p);
@@ -299,50 +454,73 @@ document.getElementById('browser-input').addEventListener('keydown', e => {
 
 function browserUp() {
   if (!browserCurrent || browserCurrent === '此电脑') return;
-  loadBrowse(browserParent);  // parent 为空时显示"此电脑"盘符列表
+  loadBrowse(browserParent);
 }
+
 async function chooseBrowser() {
   if (browserMode === 'file') {
-    if (browserChoice) document.getElementById('inp-script').value = browserChoice;
-    closeBrowser();
-    await detectPrefix();
+    if (browserChoice) {
+      browserTarget.value = browserChoice;
+      closeBrowser();
+      await detectPrefixForRow(browserTarget.closest('.script-row'));
+    } else {
+      alert('请先选中一个剧本文件');
+      return;
+    }
   } else {
-    if (browserCurrent && browserCurrent !== '此电脑') document.getElementById('inp-videos').value = browserCurrent;
-    else alert('请先进入某个文件夹再选择');
+    if (browserCurrent && browserCurrent !== '此电脑') browserTarget.value = browserCurrent;
+    else { alert('请先进入某个文件夹再选择'); return; }
     closeBrowser();
   }
-  saveSettings();  // 立即记住本次选择的位置（下次打开弹窗默认定位到这里）
+  saveSettings();  // 立即记住本次选择的位置
 }
 
-function esc(s) { const d = document.createElement('span'); d.textContent = s; return d.innerHTML; }
-
-/* ---------- 前缀自动检测 ---------- */
-async function detectPrefix() {
-  const script = document.getElementById('inp-script').value;
-  if (!script) return;
-  const r = await fetch('/api/detect_prefix', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({script}) });
-  const d = await r.json();
-  const sug = document.getElementById('prefix-sug');
-  if (d.ok && d.suggestions.length) {
-    const best = d.suggestions[0];
-    document.getElementById('inp-prefix').value = best.prefix;
-    sug.textContent = `检测到剧本使用「${best.prefix}」开头（共${best.count}个镜头）`;
-  } else {
-    sug.textContent = '未检测到镜头标识，请手动填写';
+/* ---------- 前缀自动检测（按行） ---------- */
+async function detectPrefixForRow(scriptRow) {
+  const pathEl = scriptRow.querySelector('.inp-script');
+  const path = pathEl.value.trim();
+  if (!path) return;
+  const sug = scriptRow.querySelector('.prefix-sug');
+  try {
+    const r = await fetch('/api/detect_prefix', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({script: path}) });
+    const d = await r.json();
+    if (d.ok && d.suggestions.length) {
+      // unique=序号全局唯一的主级镜头单位；多个全填（逗号分隔），支持一个文件混多种镜头格式（如 P01 + 剧情12-1）
+      const mains = d.suggestions.filter(s => s.unique);
+      const subs = d.suggestions.filter(s => !s.unique);
+      if (mains.length) {
+        const joined = mains.map(s => s.prefix).join(',');
+        scriptRow.querySelector('.inp-prefix').value = joined;
+        const total = mains.reduce((a, s) => a + s.count, 0);
+        sug.textContent = `已自动填入「${joined}」（共${total}个镜头${mains.length > 1 ? '，含多种镜头格式' : ''}）` +
+          (subs.length ? `；另检测到子级单位「${subs[0].prefix}」已忽略` : '');
+      } else {
+        sug.textContent = `检测到「${d.suggestions.map(s => s.prefix).join('、')}」但序号有重复，请手动确认`;
+      }
+    } else {
+      sug.textContent = '未检测到镜头标识，请手动填写';
+    }
+  } catch (e) {
+    sug.textContent = '检测失败，请手动填写';
   }
 }
 
 /* ---------- 识别流程 ---------- */
 async function startAnalyze() {
-  const script = document.getElementById('inp-script').value;
-  const videos = document.getElementById('inp-videos').value;
-  const prefix = document.getElementById('inp-prefix').value.trim();
-  if (!script || !videos || !prefix) { alert('请先选择剧本文件、视频文件夹，并填写镜头标识'); return; }
+  const scriptList = [...document.querySelectorAll('.script-row')].map(row => ({
+    path: row.querySelector('.inp-script').value.trim(),
+    prefix: row.querySelector('.inp-prefix').value.trim()
+  })).filter(s => s.path);
+  const videoList = [...document.querySelectorAll('.inp-videos')].map(i => i.value.trim()).filter(Boolean);
 
-  const r = await fetch('/api/analyze', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({script, videos, prefix}) });
+  if (!scriptList.length || !videoList.length) { alert('请先选择剧本文件和视频文件夹（至少各一项）'); return; }
+  const missing = scriptList.find(s => !s.prefix);
+  if (missing) { alert(`剧本「${missing.path.split('\\').pop()}」还没填写镜头标识前缀`); return; }
+
+  const r = await fetch('/api/analyze', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({scripts: scriptList, videos: videoList}) });
   const d = await r.json();
   if (!d.ok) { alert(d.msg); return; }
-  saveSettings();  // 记住本次路径和前缀
+  saveSettings();
 
   document.getElementById('card-setup').hidden = true;
   document.getElementById('card-progress').hidden = false;
@@ -365,6 +543,7 @@ async function pollStatus() {
 async function loadResults() {
   const r = await fetch('/api/results');
   const d = await r.json();
+  scripts = d.scripts;
   sections = d.sections;
   results = d.results;
 
@@ -378,15 +557,22 @@ async function loadResults() {
       : res.status === 'low'
         ? `<span class="badge low">请确认 ${res.score}分</span>`
         : '<span class="badge nospeech">无台词</span>';
+    // 按剧本分组的镜头下拉
     let options = '<option value="-1">— 未指定 / 无台词 —</option>';
-    sections.forEach((s, si) => {
-      const sel = res.best === si ? ' selected' : '';
-      options += `<option value="${si}"${sel}>${esc(s.title_short)}</option>`;
+    scripts.forEach((sc, si) => {
+      options += `<optgroup label="${escAttr(sc.stem)}">`;
+      sections.forEach((s, gi) => {
+        if (s.script_idx === si) {
+          const sel = res.best === gi ? ' selected' : '';
+          options += `<option value="${gi}"${sel}>${esc(s.title_short)}</option>`;
+        }
+      });
+      options += '</optgroup>';
     });
     tr.innerHTML = `
       <td><button class="play-btn" title="用系统播放器打开" onclick="openVideo(${i})">▶</button></td>
-      <td class="file-cell" title="${esc(res.file)}">${esc(res.file)}</td>
-      <td class="recognized" title="${esc(res.recognized)}">${esc(res.recognized || '（无语音）')}</td>
+      <td class="file-cell" title="${escAttr(res.file)}">${esc(res.file)}</td>
+      <td class="recognized" title="${escAttr(res.recognized)}">${esc(res.recognized || '（无语音）')}</td>
       <td><select class="shot-select" id="sel-${i}" onchange="onShotChange(${i})">${options}</select></td>
       <td>${statusBadge}</td>
       <td><input class="name-input" id="name-${i}" value="" placeholder="未指定"></td>`;
@@ -397,19 +583,20 @@ async function loadResults() {
   const nLow = results.filter(r => r.status === 'low').length;
   const nNo = results.filter(r => r.status === 'nospeech').length;
   document.getElementById('review-summary').innerHTML =
-    `共 <b>${results.length}</b> 个视频：可信 ${nOk}，需确认 <b class="warn-text">${nLow}</b>，无台词 <b class="err-text">${nNo}</b>（请为无台词视频手动选择镜头或填写文件名）`;
+    `共 <b>${results.length}</b> 个视频：可信 ${nOk}，需确认 <b class="warn-text">${nLow}</b>，无台词 <b class="err-text">${nNo}</b>。确认后按剧本名分文件夹存放。`;
   document.getElementById('card-progress').hidden = true;
   document.getElementById('card-review').hidden = false;
 }
 
 function onShotChange(i) { refreshNames(); }
 
-/* 自动生成文件名：序号_台词开头（n）.扩展名 */
+/* 自动生成文件名：序号_台词开头（n）.扩展名；同镜头多视频按所在文件夹分别编号 */
 function refreshNames() {
-  const groups = {};  // 镜头索引 -> [行号]
+  // 分组键 = 镜头全局索引 + 所在文件夹（不同文件夹的同镜头视频互不占用编号）
+  const groups = {};
   results.forEach((res, i) => {
     const si = parseInt(document.getElementById(`sel-${i}`).value);
-    if (si >= 0) (groups[si] = groups[si] || []).push(i);
+    if (si >= 0) (groups[si + '|' + res.dir] = groups[si + '|' + res.dir] || []).push(i);
   });
   Object.values(groups).forEach(rows => {
     const multi = rows.length > 1;
@@ -418,14 +605,19 @@ function refreshNames() {
       const sec = sections[parseInt(document.getElementById(`sel-${i}`).value)];
       const ext = res.file.substring(res.file.lastIndexOf('.'));
       const base = res.clean ? res.clean.substring(0, 12) : '无台词';
-      const name = String(sec.num).padStart(2, '0') + '_' + base + (multi ? `（${k + 1}）` : '') + ext;
-      document.getElementById(`name-${i}`).value = name;
+      const name = sec.num + '_' + base + (multi ? `（${k + 1}）` : '') + ext;
+      const input = document.getElementById(`name-${i}`);
+      input.value = name;
+      input.title = `将移入: ${res.dir}\\${scripts[sec.script_idx].stem}\\`;
     });
   });
-  // 未指定镜头的行清空
+  // 未指定镜头的行清空（原地不动）
   results.forEach((res, i) => {
     const si = parseInt(document.getElementById(`sel-${i}`).value);
-    if (si < 0) document.getElementById(`name-${i}`).value = '';
+    if (si < 0) {
+      document.getElementById(`name-${i}`).value = '';
+      document.getElementById(`name-${i}`).title = '未指定镜头：填写文件名将在原文件夹改名';
+    }
   });
 }
 
@@ -438,10 +630,15 @@ async function confirmRename() {
   const items = [];
   results.forEach((res, i) => {
     const newName = document.getElementById(`name-${i}`).value.trim();
-    if (newName) items.push({ old: res.file, new: newName });
+    const si = parseInt(document.getElementById(`sel-${i}`).value);
+    if (newName) items.push({
+      old: res.path,
+      new: newName,
+      script_idx: si >= 0 ? sections[si].script_idx : -1
+    });
   });
   if (!items.length) { alert('没有可重命名的文件：请先为视频指定镜头或填写新文件名'); return; }
-  if (!confirm(`确定将 ${items.length} 个视频重命名吗？\n（未填写新文件名的视频保持原名）`)) return;
+  if (!confirm(`确定将 ${items.length} 个视频重命名吗？\n（已指定镜头的视频将移入剧本同名子文件夹；未指定的原地改名）`)) return;
 
   const r = await fetch('/api/rename', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({items}) });
   const d = await r.json();
@@ -449,7 +646,7 @@ async function confirmRename() {
   let html = d.done.length
     ? `<div class="result-line ok-text">✔ 成功重命名 ${d.done.length} 个文件</div>`
     : `<div class="result-line err-text">✘ 没有文件改名成功，请查看下方原因</div>`;
-  d.done.forEach(x => html += `<div class="result-line mono">${esc(x.old)} → ${esc(x.new)}</div>`);
+  d.done.forEach(x => html += `<div class="result-line mono">${esc(x.old.split('\\').pop())} → ${esc(x.new)}</div>`);
   if (d.skipped.length) {
     html += `<div class="result-line warn-text" style="margin-top:10px">⚠ ${d.skipped.length} 个文件跳过：</div>`;
     d.skipped.forEach(x => html += `<div class="result-line mono">${esc(x.file)}（${esc(x.reason)}）</div>`);
@@ -473,11 +670,6 @@ async function rollback() {
 }
 
 /* ---------- 初始化 ---------- */
-// 剧本路径手动粘贴/输入后，自动检测镜头前缀
-document.getElementById('inp-script').addEventListener('change', function () {
-  if (this.value.trim()) detectPrefix();
-});
-// 页面加载时恢复上次使用的路径
 loadSettings();
 </script>
 </body>

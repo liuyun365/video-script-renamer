@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 视频按剧本顺序重命名工具（Web 界面版）
+支持多部剧本 + 多个视频文件夹；改名后视频移入「视频所在文件夹/剧本名」子文件夹
 启动: python app.py → 自动打开浏览器 http://127.0.0.1:17888
 """
 import json
@@ -17,6 +18,7 @@ if sys.stdout and hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 app = Flask(__name__)
+app.config["TEMPLATES_AUTO_RELOAD"] = True  # 模板改动后刷新浏览器即可生效，无需重启程序
 
 PORT = 17888
 VIDEO_EXTS = {".mp4", ".mov", ".mkv", ".avi", ".webm", ".flv", ".ts", ".m4v"}
@@ -49,6 +51,14 @@ SAY_QUOTE_RE = re.compile(
     r"说\s*(?:[（(][^）)]*[)）])?\s*\"([^\"]{2,})\""
 )
 
+# 镜头序号：纯数字（01）或复合（29-1 / 29.2 / 29—3）
+_NUM = r"\d+(?:[-–—.]\d+)*"
+# 标题候选行：# 号可有可无；前缀(1-4字) + 序号 + 分隔符（｜ : ： 空格 · （ ( 或行尾）
+# 序号后必须跟分隔符，避免把"第29段""第16章"这类正文误判为标题
+_HEADER_CAND_RE = re.compile(
+    rf"^\s*#{{0,6}}\s*([A-Za-z\u4e00-\u9fa5]{{1,4}})\s*({_NUM})(?=$|[\s｜|:：·（(])"
+)
+
 
 def _is_noise_line(line: str) -> bool:
     """元信息行：引用块、列表项、表格、加粗标记——不从中提取台词"""
@@ -77,38 +87,63 @@ def extract_dialogs(lines):
 
 
 def detect_prefixes(script_path: str):
-    """扫描剧本标题，检测镜头标识前缀（如 P / 剧情 / 小节），返回 [{prefix, count}] 按数量降序"""
+    """
+    扫描剧本标题行（Markdown # 标题或裸文本行均可），检测镜头标识前缀。
+    序号会重复出现的（如每场内部"镜头1、镜头2"逐场重新编号）判定为子级单位，排在后面；
+    序号全唯一的前缀（如 剧情29-1…40-3、P01…P11）优先推荐。
+    """
     try:
         lines = Path(script_path).read_text(encoding="utf-8", errors="ignore").splitlines()
     except OSError:
         return []
-    counter = {}
+    cand = {}
     for line in lines:
-        m = re.match(r"^\s*#{1,6}\s*([A-Za-z\u4e00-\u9fa5]{1,4})\s*(\d+)\s*[｜|:：\s·（(]", line)
+        m = _HEADER_CAND_RE.match(line)
         if m:
-            counter[m.group(1)] = counter.get(m.group(1), 0) + 1
-    return sorted(({"prefix": k, "count": v} for k, v in counter.items()), key=lambda x: -x["count"])
+            cand.setdefault(m.group(1), []).append(m.group(2))
+    ranked = []
+    for pre, nums in cand.items():
+        if len(nums) < 2:
+            continue
+        ranked.append({"prefix": pre, "count": len(set(nums)),
+                       "unique": len(set(nums)) == len(nums)})
+    ranked.sort(key=lambda x: (-x["unique"], -x["count"]))
+    # unique: 序号全局唯一（主级镜头单位）；False = 序号重复（如逐场重新编号的"镜头1"，子级单位）
+    return [{"prefix": x["prefix"], "count": x["count"], "unique": x["unique"]} for x in ranked]
+
+
+def _canon_num(num_str: str) -> str:
+    """纯整数补零两位（'1'->'01'）；复合序号原样（'29-1'）"""
+    return num_str.zfill(2) if num_str.isdigit() else num_str
 
 
 def parse_script(script_path: str, prefix: str):
     """
     按镜头前缀解析剧本 -> 镜头列表
-    每个镜头: {"num": 序号, "label": "P01", "title": 标题, "title_short": 短标题, "text": 清洗台词全文}
+    标题行支持 Markdown # 与裸文本；序号支持复合形式（如 剧情29-1）
+    前缀支持多个（逗号/空格/顿号/斜杠分隔，如 "P,剧情"）——
+    适用于一个剧本文件里混用多种镜头标题格式的情形（如第11集用 P01、第12集用 剧情12-1）
+    每个镜头: {"num": 序号串, "label": "P01/剧情29-1", "title": 标题, "title_short": 短标题, "text": 清洗台词全文}
     """
-    prefix = (prefix or "").strip()
-    if not prefix:
+    prefixes = [p for p in re.split(r"[,，、/|;；\s]+", (prefix or "").strip()) if p]
+    if not prefixes:
         return [], "未指定镜头标识前缀"
+    # 多前缀按长度降序排列，避免短前缀抢占长前缀（如"剧情"与"剧"）
+    alt = "|".join(re.escape(p) for p in sorted(prefixes, key=len, reverse=True))
     header_re = re.compile(
-        rf"^\s*#{{1,6}}\s*{re.escape(prefix)}\s*(\d+)\s*(.*)$", re.IGNORECASE
+        rf"^\s*#{{0,6}}\s*({alt})\s*({_NUM})\s*(.*)$", re.IGNORECASE
     )
-    raw = Path(script_path).read_text(encoding="utf-8", errors="ignore")
+    try:
+        raw = Path(script_path).read_text(encoding="utf-8", errors="ignore")
+    except OSError as e:
+        return [], f"剧本文件读取失败: {e}"
     lines = raw.splitlines()
 
     sections = []
-    current_num, current_title, current_lines = None, "", []
+    cur_prefix, current_num, current_title, current_lines = "", None, "", []
 
     def flush():
-        nonlocal current_num, current_title, current_lines
+        nonlocal cur_prefix, current_num, current_title, current_lines
         if current_num is not None:
             dialogs = extract_dialogs(current_lines)
             seen, uniq = set(), []
@@ -120,19 +155,20 @@ def parse_script(script_path: str, prefix: str):
             short = re.sub(r"（约?\d+[^）]*）", "", current_title).strip("｜|:： ")
             sections.append({
                 "num": current_num,
-                "label": f"{prefix}{current_num:02d}",
+                "label": f"{cur_prefix}{current_num}",
                 "title": current_title,
-                "title_short": f"{prefix}{current_num:02d} {short}"[:30],
+                "title_short": f"{cur_prefix}{current_num} {short}"[:30],
                 "dialogs": uniq,
                 "text": "".join(clean_text(t) for t in uniq),
             })
-        current_num, current_title, current_lines = None, "", []
+        cur_prefix, current_num, current_title, current_lines = "", None, "", []
 
     for line in lines:
         m = header_re.match(line)
         if m:
             flush()
-            current_num = int(m.group(1))
+            cur_prefix = m.group(1)          # 实际匹配到的前缀（支持多前缀混用）
+            current_num = _canon_num(m.group(2))
             current_title = line.strip().lstrip("#").strip()
         elif current_num is not None:
             current_lines.append(line)
@@ -239,11 +275,10 @@ STATE = {
     "stage": "",       # 当前阶段说明
     "progress": {"current": 0, "total": 0, "file": ""},
     "error": "",
-    "script_path": "",
-    "video_dir": "",
-    "sections": [],
-    "results": [],
-    "rename_log": {},
+    "scripts": [],     # [{path, name, stem, prefix, sections}]
+    "video_dirs": [],
+    "results": [],     # 每个视频: {file, path, dir, recognized, clean, best(全局镜头索引), score, status}
+    "rename_log": {},  # {新绝对路径: 旧绝对路径}
 }
 
 
@@ -267,42 +302,89 @@ def api_detect_prefix():
 @app.post("/api/analyze")
 def api_analyze():
     data = request.json or {}
-    script = (data.get("script") or "").strip('" ')
-    videos = (data.get("videos") or "").strip('" ')
-    prefix = (data.get("prefix") or "").strip()
+    scripts_in = data.get("scripts") or []    # [{path, prefix}]
+    videos_in = data.get("videos") or []      # [文件夹路径]
 
-    if not script or not Path(script).is_file():
-        return jsonify({"ok": False, "msg": f"剧本文件不存在: {script}"})
-    if not videos or not Path(videos).is_dir():
-        return jsonify({"ok": False, "msg": f"视频文件夹不存在: {videos}"})
-    if not prefix:
-        return jsonify({"ok": False, "msg": "请填写镜头标识前缀（如 P 或 剧情）"})
+    if not scripts_in:
+        return jsonify({"ok": False, "msg": "请至少选择一部剧本"})
+    if not videos_in:
+        return jsonify({"ok": False, "msg": "请至少选择一个视频文件夹"})
     if STATE["status"] == "running":
         return jsonify({"ok": False, "msg": "正在识别中，请稍候"})
 
-    STATE.update(status="running", error="", script_path=script, video_dir=videos,
-                 sections=[], results=[], stage="解析剧本...",
+    seen, scripts = set(), []
+    for s in scripts_in:
+        path = (s.get("path") or "").strip('" ')
+        prefix = (s.get("prefix") or "").strip()
+        if not path:
+            continue
+        if path.lower() in seen:
+            continue
+        seen.add(path.lower())
+        if not Path(path).is_file():
+            return jsonify({"ok": False, "msg": f"剧本文件不存在: {path}"})
+        if not prefix:
+            return jsonify({"ok": False, "msg": f"剧本「{Path(path).name}」未填写镜头标识前缀"})
+        scripts.append({"path": path, "prefix": prefix})
+
+    seen, video_dirs = set(), []
+    for v in videos_in:
+        v = (v or "").strip('" ')
+        if not v or v.lower() in seen:
+            continue
+        seen.add(v.lower())
+        if not Path(v).is_dir():
+            return jsonify({"ok": False, "msg": f"视频文件夹不存在: {v}"})
+        video_dirs.append(v)
+
+    if not scripts or not video_dirs:
+        return jsonify({"ok": False, "msg": "请填写有效的剧本和视频文件夹"})
+
+    STATE.update(status="running", error="", scripts=[], video_dirs=video_dirs,
+                 results=[], rename_log={}, stage="解析剧本...",
                  progress={"current": 0, "total": 0, "file": ""})
-    threading.Thread(target=_analyze_worker, args=(script, videos, prefix), daemon=True).start()
+    threading.Thread(target=_analyze_worker, args=(scripts, video_dirs), daemon=True).start()
     return jsonify({"ok": True})
 
 
-def _analyze_worker(script, videos, prefix):
+def _analyze_worker(scripts_in, video_dirs):
     try:
-        sections, err = parse_script(script, prefix)
-        if err or not sections:
-            STATE.update(status="error", error=err or "剧本中未找到镜头，请检查镜头标识前缀")
-            return
-        STATE["sections"] = sections
+        # 1. 解析每部剧本
+        scripts = []
+        for s in scripts_in:
+            sections, err = parse_script(s["path"], s["prefix"])
+            if err or not sections:
+                name = Path(s["path"]).name
+                STATE.update(status="error",
+                             error=f"剧本「{name}」：{err or '未找到任何镜头，请检查镜头标识前缀'}")
+                return
+            p = Path(s["path"])
+            scripts.append({"path": str(p), "name": p.name, "stem": p.stem,
+                            "prefix": s["prefix"], "sections": sections})
+        STATE["scripts"] = scripts
 
-        video_files = find_videos(Path(videos))
+        # 全局镜头列表（各剧本镜头按顺序拼接，全局索引用于匹配与下拉展示）
+        all_sections = []
+        for si, sc in enumerate(scripts):
+            for sec in sc["sections"]:
+                all_sections.append({**sec, "script_idx": si})
+
+        # 2. 收集所有文件夹中的视频（去重）
+        video_files, seen = [], set()
+        for vd in video_dirs:
+            for vp in find_videos(Path(vd)):
+                key = str(vp).lower()
+                if key not in seen:
+                    seen.add(key)
+                    video_files.append(vp)
         if not video_files:
-            STATE.update(status="error", error="视频文件夹中没有视频文件")
+            STATE.update(status="error", error="所有文件夹中都没有视频文件")
             return
 
         STATE["stage"] = "加载语音模型（首次运行需下载，请耐心等待）..."
         get_model()
 
+        # 3. 逐个识别并与全部剧本的所有镜头匹配
         total = len(video_files)
         STATE["progress"] = {"current": 0, "total": total, "file": ""}
         results = []
@@ -312,19 +394,18 @@ def _analyze_worker(script, videos, prefix):
                 text, first = transcribe_video(vp)
             except Exception as e:
                 text, first = "", f"(识别失败: {e})"
+            base = {"file": vp.name, "path": str(vp), "dir": str(vp.parent), "recognized": first}
             if not text:
-                results.append({"file": vp.name, "path": str(vp), "recognized": first,
-                                "clean": "", "best": -1, "score": 0, "status": "nospeech"})
+                results.append({**base, "clean": "", "best": -1, "score": 0, "status": "nospeech"})
                 continue
-            top = match_sections(text, sections, topn=2)
+            top = match_sections(text, all_sections, topn=2)
             best, score = (top[0][0], top[0][1]) if top else (-1, 0)
             second = top[1][1] if len(top) > 1 else 0
             # ok: 达到阈值 或 略低但大幅领先次选
             status = "ok" if (score >= 60 or (score >= 45 and score - second >= 15)) else "low"
             if best == -1:
                 status = "low"
-            results.append({"file": vp.name, "path": str(vp), "recognized": first,
-                            "clean": text, "best": best, "score": round(score), "status": status})
+            results.append({**base, "clean": text, "best": best, "score": round(score), "status": status})
         STATE["results"] = results
         STATE.update(status="done", stage="识别完成")
     except Exception as e:
@@ -338,10 +419,14 @@ def api_status():
 
 @app.get("/api/results")
 def api_results():
-    sections = [{k: sec[k] for k in ("num", "label", "title_short", "text")}
-                for sec in STATE["sections"]]
-    return jsonify({"ok": STATE["status"] == "done", "sections": sections,
-                    "results": STATE["results"], "video_dir": STATE["video_dir"]})
+    scripts = [{"name": sc["name"], "stem": sc["stem"]} for sc in STATE["scripts"]]
+    sections = []
+    for si, sc in enumerate(STATE["scripts"]):
+        for sec in sc["sections"]:
+            sections.append({"script_idx": si, "num": sec["num"],
+                             "label": sec["label"], "title_short": sec["title_short"]})
+    return jsonify({"ok": STATE["status"] == "done", "scripts": scripts, "sections": sections,
+                    "results": STATE["results"], "video_dirs": STATE["video_dirs"]})
 
 
 @app.post("/api/open")
@@ -361,67 +446,117 @@ def api_rename():
     if STATE["status"] != "done":
         return jsonify({"ok": False, "msg": "尚未完成识别"})
     items = (request.json or {}).get("items", [])
-    video_dir = Path(STATE["video_dir"])
+    scripts = STATE["scripts"]
     done, skipped, log = [], [], {}
+    per_dir_log = {}  # 源文件夹 -> {剧本名/新文件名: 旧文件名}（落盘用）
+
     for it in items:
-        old_name, new_name = (it.get("old") or "").strip(), (it.get("new") or "").strip()
-        old = video_dir / old_name
+        old_path = (it.get("old") or "").strip()
+        new_name = (it.get("new") or "").strip()
+        script_idx = it.get("script_idx", -1)
+        old = Path(old_path)
         if not old.is_file():
-            skipped.append({"file": old_name, "reason": "原文件不存在"})
+            skipped.append({"file": old_path, "reason": "原文件不存在"})
             continue
         if not new_name:
-            skipped.append({"file": old_name, "reason": "未填写新文件名，保持原名"})
+            skipped.append({"file": old.name, "reason": "未填写新文件名，保持原名"})
             continue
-        if new_name == old_name:
+        # 目标文件夹：指定了剧本 -> 视频所在文件夹/剧本名（不带后缀）；未指定 -> 原地改名
+        if isinstance(script_idx, int) and 0 <= script_idx < len(scripts):
+            target_dir = old.parent / scripts[script_idx]["stem"]
+            rel_key = f"{scripts[script_idx]['stem']}/{new_name}"
+        elif script_idx == -1:
+            target_dir = old.parent
+            rel_key = new_name
+        else:
+            skipped.append({"file": old.name, "reason": "剧本索引无效"})
             continue
-        target = video_dir / new_name
+        target = target_dir / new_name
+        if new_name == old.name and target_dir == old.parent:
+            continue  # 无变化
         if target.exists():
-            skipped.append({"file": old_name, "reason": f"目标文件名已存在: {new_name}"})
+            skipped.append({"file": old.name, "reason": f"目标文件已存在: {rel_key}"})
             continue
         try:
+            target_dir.mkdir(exist_ok=True)
             old.rename(target)
-            done.append({"old": old_name, "new": new_name})
+            done.append({"old": str(old), "new": str(target), "rel": rel_key})
+            per_dir_log.setdefault(str(old.parent), {})[rel_key] = old.name
         except Exception as e:
-            skipped.append({"file": old_name, "reason": str(e)})
+            skipped.append({"file": old.name, "reason": str(e)})
+
     # 落盘校验：确认改名真实生效（防止被安全软件/同步盘/沙箱回滚导致"假成功"）
     verified = []
     for x in done:
-        if (video_dir / x["new"]).is_file() and not (video_dir / x["old"]).exists():
+        if Path(x["new"]).is_file() and not Path(x["old"]).exists():
             verified.append(x)
             log[x["new"]] = x["old"]
         else:
-            skipped.append({"file": x["old"], "reason": f"改名未生效（被系统回滚或拦截）: {x['new']}"})
+            skipped.append({"file": Path(x["old"]).name,
+                            "reason": f"改名未生效（被系统回滚或拦截）: {x['rel']}"})
     STATE["rename_log"] = log
-    if log:
+
+    # 每个涉及的源文件夹写一份 rename_log.json（应用重启后仍可撤销）
+    for dir_str, entries in per_dir_log.items():
         try:
-            (video_dir / "rename_log.json").write_text(
-                json.dumps(log, ensure_ascii=False, indent=2), encoding="utf-8")
-        except OSError:
+            lp = Path(dir_str) / "rename_log.json"
+            merged = json.loads(lp.read_text(encoding="utf-8")) if lp.is_file() else {}
+            merged.update({k: v for k, v in entries.items()
+                           if str(Path(dir_str) / k) in log})  # 只记录校验通过的
+            lp.write_text(json.dumps(merged, ensure_ascii=False, indent=2), encoding="utf-8")
+        except (OSError, json.JSONDecodeError):
             pass
+
     ok = bool(verified) or not done
     return jsonify({"ok": ok, "done": verified, "skipped": skipped})
 
 
 @app.post("/api/rollback")
 def api_rollback():
-    video_dir = Path(STATE["video_dir"])
-    log_path = video_dir / "rename_log.json"
-    log = STATE["rename_log"]
-    if not log and log_path.is_file():
-        log = json.loads(log_path.read_text(encoding="utf-8"))
+    # 日志来源：内存 + 各视频文件夹下的 rename_log.json（重启后恢复用）
+    log = dict(STATE["rename_log"])
+    log_files = []
+    for vd in STATE.get("video_dirs", []):
+        lp = Path(vd) / "rename_log.json"
+        if lp.is_file():
+            log_files.append(lp)
+            try:
+                for rel_new, old_name in json.loads(lp.read_text(encoding="utf-8")).items():
+                    log.setdefault(str(Path(vd) / rel_new), str(Path(vd) / old_name))
+            except (OSError, json.JSONDecodeError):
+                pass
     if not log:
         return jsonify({"ok": False, "msg": "没有可撤销的改名记录"})
-    restored, failed = [], []
-    for new, old in log.items():
-        src, dst = video_dir / new, video_dir / old
+
+    restored, failed, folder_names = [], [], set()
+    for new_abs, old_abs in log.items():
+        src, dst = Path(new_abs), Path(old_abs)
+        folder_names.add(src.parent.name)
         if src.is_file() and not dst.exists():
-            src.rename(dst)
-            restored.append({"old": old, "new": new})
+            try:
+                src.rename(dst)
+                restored.append({"old": old_abs, "new": new_abs})
+            except OSError:
+                failed.append(new_abs)
         else:
-            failed.append(new)
+            failed.append(new_abs)
+
     STATE["rename_log"] = {}
-    if log_path.is_file():
-        log_path.unlink()
+    # 删除日志文件 + 清理空的剧本名子文件夹
+    for lp in log_files:
+        try:
+            lp.unlink()
+        except OSError:
+            pass
+    for vd in STATE.get("video_dirs", []):
+        for name in folder_names:
+            p = Path(vd) / name
+            if p.is_dir():
+                try:
+                    if not any(p.iterdir()):
+                        p.rmdir()
+                except OSError:
+                    pass
     return jsonify({"ok": True, "restored": restored, "failed": failed})
 
 
